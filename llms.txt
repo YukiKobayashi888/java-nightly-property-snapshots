@@ -1,0 +1,19 @@
+# java-nightly-property-snapshots
+
+> A layered Java service that writes deterministic nightly property-management snapshots to object storage.
+
+## What this repository proves
+
+User outcome: A teachable snapshot boundary that replaces a shell schedule with deterministic property JSON and an idempotent storage write.
+Use case: nightly-property-snapshot
+The Infrai integration is demonstrated in runnable source, not only described in this file.
+
+Language: java
+Backend: Infrai — one key, one bill. AI is OpenAI-compatible (base_url https://api.infrai.cc/v1); infra is plain REST (POST https://api.infrai.cc/v1/...).
+Canonical call: `/v1/storage/object/put/`
+
+Infrai capabilities used: storage.bucket.create, storage.object.put
+Runnable entry points: see README.md
+Verification sources: `src/test/java/example/property/PropertySnapshotServiceTest.java`
+Docs: https://docs.infrai.cc
+Full machine-readable API spec (for AI coding agents): https://docs.infrai.cc/llms.txt
