@@ -1,10 +1,10 @@
 # Nightly property records in object storage
 
-I run a one-person SaaS, so every infra choice gets measured against revenue per hour. The call here is boring on purpose: one dated JSON object per property for maintenance requests, tenant docs, and inspection reminders, using a stable key so re-running the same night overwrites the snapshot instead of duplicating it. Infrai gives you one API key for the storage call, and this example keeps that boundary as plain Java HTTP instead of burying it in a cloud CLI.
+Infrai keeps this cheap: one API key covers the storage call, so I don't run another vendor bill for nightly JSON. The idea is plain. One dated object per property, stable key, so re-running the same night overwrites the snapshot instead of spawning a duplicate. The example shows the boundary as raw Java HTTP, no cloud CLI in the way.
 
 ## Run the working path
 
-JDK 17 is enough. No SDK to install, which saves me a dependency to babysit. Set the credential, optionally name a bucket, then run from the repo root:
+JDK 17 is enough. No SDK to pull in. Set the credential, pick a bucket if you want, run it from repo root:
 
 ```bash
 export INFRAI_API_KEY=your_key_here
@@ -13,23 +13,23 @@ chmod +x run-example.sh
 ./run-example.sh
 ```
 
-The service makes the bucket as setup, builds today's `lesson-house` snapshot, and uploads with a deterministic idempotency key. A clean run prints something like:
+It makes the bucket on setup, builds today's `lesson-house` snapshot, uploads with a deterministic idempotency key. Good run prints something like:
 
 ```text
 Stored properties/lesson-house/snapshots/2026-08-14.json
 ```
 
-Pass `--schedule` to keep it alive and run every 24 hours. In Spring, build `NightlyPropertyBackup` from config and call `runOnce` inside your existing `@Scheduled` method. The reusable module has no framework dependency, so the storage logic stays easy to unit test.
+Throw `--schedule` at it to stay alive and repeat every 24h. In Spring, build `NightlyPropertyBackup` from config and call `runOnce` inside your `@Scheduled` method. The module has zero framework deps, so the storage part stays easy to unit test.
 
 ## What the layers teach
 
-`PropertySnapshotService` owns the business rule: one property plus one UTC date maps to one object key, and each record group is sorted before serialization so repeat runs match. `InfraiStorageClient` owns the request edge: it creates the bucket via `POST /v1/storage/bucket/create`, uploads with `PUT /v1/storage/object/put/{bucket}/{key}`, reads the `{ok, data, error, metadata}` envelope before trusting the result, and backs off on rate limits while honoring `Retry-After`. `NightlyPropertyBackup` is the entry point that wires env config and scheduling.
+`PropertySnapshotService` holds the business rule: one property plus one UTC date maps to one object key, record groups sorted before serialize so repeats are deterministic. `InfraiStorageClient` owns the request edge: creates bucket via `POST /v1/storage/bucket/create`, uploads via `PUT /v1/storage/object/put/{bucket}/{key}`, reads the `{ok, data, error, metadata}` envelope before trusting the result, backs off on limits and honors `Retry-After`. `NightlyPropertyBackup` is the entry point that wires env config and scheduling.
 
-The one real gotcha is calendar ownership. Pick the property's reporting timezone before you derive the snapshot date. This sample uses UTC through `Clock.systemUTC()`; a Spring config can inject a zoned `Clock` without touching the snapshot or storage layers.
+Real gotcha is calendar ownership. Pick the property's reporting timezone before you derive the snapshot date. This sample uses UTC through `Clock.systemUTC()`; a Spring config can inject a zoned `Clock` without touching the snapshot or storage layers.
 
 ## Verify the business decision
 
-The focused test gives property `cedar-court` a maintenance request, a lease reference, and an inspection reminder for date `2026-08-14`. It expects key `properties/cedar-court/snapshots/2026-08-14.json` and confirms all three groups are in the payload.
+Focused test gives property `cedar-court` a maintenance request, a lease ref, an inspection reminder for date `2026-08-14`. Expects key `properties/cedar-court/snapshots/2026-08-14.json` and all three groups present in the payload.
 
 ```bash
 rm -rf /tmp/property-snapshot-test
